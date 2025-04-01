@@ -1,51 +1,29 @@
 // src/cloudflare/updateUniversalSSL.ts
 
-import axios, { AxiosError } from 'axios'
-import { logger } from '../utils/logger'
-import { cloudflareEnv } from '../utils/cloudflareEnv'
+import axios from 'axios'
 import { getCloudflareHeaders } from '../utils/cloudflareHeaders'
+import { logger } from '../utils/logger'
 import { CloudflareAPIResponse } from '../types/cloudflare'
-
-const { ZONE_ID } = cloudflareEnv
-
-if (!ZONE_ID) {
-  throw new Error('Missing required Cloudflare env var: ZONE_ID')
-}
+import { logAxiosError } from '../utils/logApiError'
 
 export async function updateUniversalSSLCertificateAuthority(
-  ca: 'ssl_com' | 'lets_encrypt'
+  zoneId: string,
+  ca: 'ssl_com' | 'lets_encrypt' | 'google' | 'sectigo'
 ): Promise<void> {
-  const url = `https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/ssl/universal/settings`
+  const url = `https://api.cloudflare.com/client/v4/zones/${zoneId}/ssl/universal/settings`
+  const payload = { certificate_authority: ca }
 
   try {
-    const res = await axios.patch<CloudflareAPIResponse>(
-      url,
-      { certificate_authority: ca },
-      { headers: getCloudflareHeaders() }
-    )
+    const res = await axios.patch<CloudflareAPIResponse>(url, payload, {
+      headers: getCloudflareHeaders()
+    })
 
     if (res.data.success) {
-      logger.info(`[SUCCESS] Universal SSL CA updated to "${ca}"`)
+      logger.info(`[SUCCESS] SSL CA updated to "${ca}"`)
     } else {
-      logger.error('[FAILURE] API responded with errors')
-      logger.error(JSON.stringify(res.data.errors, null, 2))
+      logAxiosError('API error during Universal SSL CA update', res.data.errors)
     }
   } catch (error) {
-    const err = error as AxiosError<CloudflareAPIResponse>
-    logger.error('[ERROR] Failed to update Universal SSL settings')
-    if (err.response) {
-      logger.error(`Status: ${err.response.status}`)
-      logger.error(JSON.stringify(err.response.data, null, 2))
-    } else {
-      logger.error(err.message)
-    }
+    logAxiosError('Failed to update Universal SSL CA', error)
   }
-}
-
-// Local CLI test
-if (require.main === module) {
-  updateUniversalSSLCertificateAuthority('ssl_com').catch((err) => {
-    logger.error('[FATAL] Unexpected error in SSL update')
-    logger.error(err instanceof Error ? err.stack || err.message : String(err))
-  })
 }

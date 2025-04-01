@@ -1,68 +1,36 @@
 // src/cloudflare/listZones.ts
 
-import axios, { AxiosError } from 'axios'
-import { logger } from '../utils/logger'
+import axios from 'axios'
 import { getCloudflareHeaders } from '../utils/cloudflareHeaders'
 import { toQueryString } from '../utils/queryString'
-import {
-  ZoneQueryParams,
-  CloudflareZoneListResponse
-} from '../types/cloudflare'
+import { logger } from '../utils/logger'
+import { CloudflareZoneListResponse } from '../types/cloudflare'
+import { logAxiosError } from '../utils/logApiError'
 
-export async function listZonesMap(
-  query: ZoneQueryParams = {}
-): Promise<Record<string, string>> {
-  const url = `https://api.cloudflare.com/client/v4/zones${toQueryString(query)}`
+export async function listZonesMap(): Promise<Record<string, string>> {
+  const url = `https://api.cloudflare.com/client/v4/zones${toQueryString({
+    match: 'all',
+    per_page: 50,
+    order: 'name'
+  })}`
 
   try {
     const res = await axios.get<CloudflareZoneListResponse>(url, {
       headers: getCloudflareHeaders()
     })
 
-    const { success, result, result_info, errors } = res.data
+    const { success, result, errors } = res.data
 
     if (!success) {
-      logger.error('[FAILURE] API returned errors')
-      logger.error(JSON.stringify(errors, null, 2))
+      logAxiosError('Cloudflare API returned error when listing zones', errors)
       return {}
     }
 
-    const zoneMap: Record<string, string> = {}
-    result.forEach((zone) => {
-      zoneMap[zone.name] = zone.id
-    })
-
-    logger.info('[SUCCESS] Zone map:')
-    logger.info(JSON.stringify(zoneMap, null, 2))
-
-    if (result_info) {
-      const { page, per_page, count, total_count } = result_info
-      logger.info(
-        `Page: ${page} / Items: ${count} / Total: ${total_count} (per_page=${per_page})`
-      )
-    }
-
+    const zoneMap = Object.fromEntries(result.map((z) => [z.name, z.id]))
+    logger.info('[SUCCESS] Retrieved zone map')
     return zoneMap
   } catch (error) {
-    const err = error as AxiosError
-    logger.error('[ERROR] Failed to fetch zones')
-    if (err.response) {
-      logger.error(`Status: ${err.response.status}`)
-      logger.error(JSON.stringify(err.response.data, null, 2))
-    } else {
-      logger.error(err.message)
-    }
+    logAxiosError('Failed to fetch zone list', error)
     return {}
   }
-}
-
-// For local test only
-if (require.main === module) {
-  listZonesMap({
-    match: 'all',
-    per_page: 50,
-    order: 'name'
-  }).then(() => {
-    logger.info('[DONE] Zone listing complete.')
-  })
 }

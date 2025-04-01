@@ -1,4 +1,4 @@
-// src/types/cloudflare.d.ts
+// src/types/cloudflare.ts
 
 export interface Zone {
   id: string
@@ -6,7 +6,7 @@ export interface Zone {
   status: string
 }
 
-export interface ZoneQueryParams {
+export interface CloudflareZoneQueryParams {
   account_id?: string
   account_name?: string
   name?: string
@@ -31,7 +31,7 @@ export interface CloudflareAPIResponse {
 export interface CloudflareZoneListResponse {
   success: boolean
   errors: CloudflareAPIError[]
-  messages: CloudflareAPIError[]
+  messages?: CloudflareAPIError[]
   result: Zone[]
   result_info?: {
     page: number
@@ -43,42 +43,9 @@ export interface CloudflareZoneListResponse {
 
 export type CaaTag = 'issue' | 'issuewild'
 
-export interface CloudflareAPIError {
-  code: number
-  message: string
-}
-
-export interface CloudflareAPIResponse {
-  success: boolean
-  errors: CloudflareAPIError[]
-}
-
-// src/types/cloudflare.ts
-
-export interface Zone {
-  id: string
-  name: string
-  status: string
-}
-
-export interface CloudflareZoneListResponse {
-  success: boolean
-  errors: { code: number; message: string }[]
-  result: Zone[]
-  result_info?: {
-    page: number
-    per_page: number
-    count: number
-    total_count: number
-  }
-}
-
-export interface CloudflareAPIError {
-  code: number
-  message: string
-}
-
-export interface CloudflareAPIResponse {
-  success: boolean
-  errors: CloudflareAPIError[]
-}
+export const CA_LIST = [
+  'amazon.com',
+  'amazontrust.com',
+  'awstrust.com',
+  'amazonaws.com'
+]

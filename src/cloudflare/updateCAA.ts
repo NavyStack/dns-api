@@ -1,29 +1,34 @@
 // src/cloudflare/updateCAA.ts
 
 import axios, { AxiosError } from 'axios'
-import { logger } from '../utils/logger'
-import { cloudflareEnv } from '../utils/cloudflareEnv'
+import { CA_LIST } from '../types/cloudflare'
 import { getCloudflareHeaders } from '../utils/cloudflareHeaders'
-import { CA_LIST } from '../constants/cloudflare'
+import { logger } from '../utils/logger'
 import { CaaTag, CloudflareAPIResponse } from '../types/cloudflare'
 
-const { ZONE_ID, RECORD_NAME } = cloudflareEnv
-
-if (!ZONE_ID || !RECORD_NAME) {
-  throw new Error(
-    'Missing required Cloudflare env vars: ZONE_ID or RECORD_NAME'
-  )
+export async function createCAARecords(
+  zoneId: string,
+  recordName: string
+): Promise<void> {
+  const tasks = CA_LIST.flatMap((ca) => [
+    addCaaRecord(zoneId, recordName, ca, 'issue'),
+    addCaaRecord(zoneId, recordName, ca, 'issuewild')
+  ])
+  await Promise.allSettled(tasks)
 }
 
-logger.info(`Auth key prefix: ${cloudflareEnv.CLOUDFLARE_API_KEY.slice(0, 10)}`)
-
-async function createCAARecord(ca: string, tag: CaaTag): Promise<void> {
+async function addCaaRecord(
+  zoneId: string,
+  name: string,
+  ca: string,
+  tag: CaaTag
+): Promise<void> {
   try {
     const res = await axios.post<CloudflareAPIResponse>(
-      `https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records`,
+      `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records`,
       {
         type: 'CAA',
-        name: RECORD_NAME,
+        name,
         data: {
           flags: 0,
           tag,
@@ -34,21 +39,23 @@ async function createCAARecord(ca: string, tag: CaaTag): Promise<void> {
     )
 
     if (res.data.success) {
-      logger.info(`[SUCCESS] ${tag} record added for ${ca}`)
+      logger.info(`[ADD] ${tag} CAA for ${ca} → ${name}`)
     } else {
-      logger.warn(`[WARN] API returned error for ${tag} ${ca}`)
-      logger.warn(JSON.stringify(res.data.errors, null, 2))
+      logApiErrors(
+        `[WARN] Failed to add ${tag} CAA for ${ca} → ${name}`,
+        res.data.errors
+      )
     }
   } catch (error) {
     const err = error as AxiosError<CloudflareAPIResponse>
+    const apiErrors = err.response?.data?.errors
 
-    if (err.response?.data?.errors?.some((e) => e.code === 81058)) {
-      logger.info(`[SKIP] ${tag} record already exists for ${ca}`)
+    if (apiErrors?.some((e) => e.code === 81058)) {
+      logger.info(`[SKIP] ${tag} CAA already exists for ${ca} → ${name}`)
     } else {
-      logger.error(`[ERROR] Failed to add ${tag} for ${ca}`)
-      if (err.response) {
-        logger.error('Status: ' + err.response.status)
-        logger.error(JSON.stringify(err.response.data, null, 2))
+      logger.error(`[ERROR] Failed to add ${tag} CAA for ${ca} → ${name}`)
+      if (apiErrors) {
+        logApiErrors(null, apiErrors)
       } else {
         logger.error(err.message)
       }
@@ -56,14 +63,7 @@ async function createCAARecord(ca: string, tag: CaaTag): Promise<void> {
   }
 }
 
-async function run(): Promise<void> {
-  for (const ca of CA_LIST) {
-    await createCAARecord(ca, 'issue')
-    await createCAARecord(ca, 'issuewild')
-  }
+function logApiErrors(context: string | null, errors: unknown): void {
+  if (context) logger.warn(context)
+  logger.warn(JSON.stringify(errors, null, 2))
 }
-
-run().catch((err) => {
-  logger.error('[FATAL] Unexpected error in run()')
-  logger.error(err instanceof Error ? err.stack || err.message : String(err))
-})
