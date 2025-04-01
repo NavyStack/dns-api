@@ -1,11 +1,17 @@
 // src/types/cloudflare.ts
 
+/**
+ * Represents a Cloudflare zone.
+ */
 export interface Zone {
   id: string
   name: string
   status: string
 }
 
+/**
+ * Query parameters for Cloudflare zone API.
+ */
 export interface CloudflareZoneQueryParams {
   account_id?: string
   account_name?: string
@@ -18,16 +24,25 @@ export interface CloudflareZoneQueryParams {
   per_page?: number
 }
 
+/**
+ * Represents an error from the Cloudflare API.
+ */
 export interface CloudflareAPIError {
   code: number
   message: string
 }
 
+/**
+ * Standard response from the Cloudflare API.
+ */
 export interface CloudflareAPIResponse {
   success: boolean
   errors: CloudflareAPIError[]
 }
 
+/**
+ * Response from listing Cloudflare zones.
+ */
 export interface CloudflareZoneListResponse {
   success: boolean
   errors: CloudflareAPIError[]
@@ -41,11 +56,27 @@ export interface CloudflareZoneListResponse {
   }
 }
 
+/**
+ * Type for CAA record tags.
+ */
 export type CaaTag = 'issue' | 'issuewild'
 
+/**
+ * List of certificate authorities.
+ */
 export const CA_LIST = [
   'amazon.com',
   'amazontrust.com',
   'awstrust.com',
-  'amazonaws.com'
+  'amazonaws.com',
+  'pki.goog; cansignhttpexchanges=yes',
+  'letsencrypt.org',
+  'ssl.com',
+  'sectigo.com',
+  'comodoca.com',
+  'digicert.com',
+  'geotrust.com',
+  'symantec.com',
+  'thawte.com',
+  'globalsign.com'
 ]
